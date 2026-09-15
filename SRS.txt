@@ -1,0 +1,483 @@
+# Software Requirements Specification (SRS)
+# Website Layanan Penyedia Jasa Sewa Rias, Busana & Aksesoris Wedding
+
+**Versi:** 1.0
+**Tanggal:** 18 Agustus 2026
+**Status:** Draft
+
+---
+
+## 1. Pendahuluan
+
+### 1.1 Tujuan
+Dokumen ini menjelaskan kebutuhan fungsional dan non-fungsional untuk pengembangan sebuah website layanan penyedia jasa **sewa tata rias, busana, dan aksesoris pernikahan**. Perlu ditegaskan bahwa sistem ini **bukan** platform Wedding Organizer (WO) — sistem tidak menangani perencanaan acara, vendor katering, dekorasi, dokumentasi, dan sejenisnya. Fokus layanan murni pada penyewaan/booking paket rias pengantin (make up artist), busana pengantin/adat, dan aksesoris pelengkap acara.
+
+### 1.2 Ruang Lingkup
+Sistem terdiri dari:
+- **1 Backend Service** (FastAPI) yang menyediakan REST API bagi kedua antarmuka.
+- **2 Frontend Application (React)**:
+  1. **Customer Web App** — untuk calon pengantin/klien mencari, melihat, dan memesan paket rias/busana/aksesoris.
+  2. **Admin Panel** — untuk pemilik usaha/staf mengelola produk, galeri, testimoni, booking, pembayaran, dan konten.
+- **Database**: CockroachDB (SQL, distributed, Postgres-wire compatible).
+
+### 1.3 Definisi & Istilah
+| Istilah | Keterangan |
+|---|---|
+| Paket | Kombinasi jasa rias + busana + aksesoris yang dijual sebagai satu unit sewa |
+| Item | Komponen tunggal (misal: gaun tertentu, riasan tertentu, aksesoris tertentu) |
+| Booking | Transaksi pemesanan paket/item untuk tanggal acara tertentu |
+| DP | Down Payment / uang muka |
+| MUA | Make Up Artist |
+| Availability | Ketersediaan item/jadwal MUA pada tanggal tertentu |
+
+### 1.4 Target Pengguna
+- **Calon pengantin / klien** (guest & registered user)
+- **Admin/Owner** (pengelola penuh sistem)
+- **Staf/Kasir** (opsional, hak akses terbatas — verifikasi pembayaran & booking)
+
+---
+
+## 2. Deskripsi Umum Sistem
+
+### 2.1 Perspektif Produk
+Sistem berbasis web, responsif (mobile-first, karena mayoritas calon pengantin mengakses via smartphone), dengan alur utama: **klien menjelajah katalog → melihat galeri & testimoni → memilih paket → cek ketersediaan tanggal → booking → pembayaran DP → konfirmasi admin → H-acara → pelunasan/serah-terima**.
+
+### 2.2 Karakteristik Pengguna
+- Klien: awam teknologi, mengutamakan visual (foto/video), butuh kepercayaan (testimoni & galeri nyata).
+- Admin: mengelola stok busana/aksesoris (fisik), jadwal MUA, dan validasi manual pembayaran (umum di UMKM jasa wedding lokal).
+
+### 2.3 Batasan (Constraints)
+- Tidak menangani pembayaran katering/dekorasi/venue.
+- Ketersediaan busana bersifat fisik (1 gaun hanya bisa dipakai 1 klien per tanggal), maka sistem butuh **manajemen inventori & kalender ketersediaan per item**, bukan hanya per paket.
+- Integrasi payment gateway lokal (Midtrans/Xendit) untuk DP, sisanya bisa cash/transfer manual saat H-acara.
+
+---
+
+## 3. Kebutuhan Fungsional
+
+### 3.1 Modul Customer (Frontend Publik)
+
+#### 3.1.1 Landing Page
+- Hero section, kategori layanan (Rias, Busana, Aksesoris, Paket Kombinasi)
+- Highlight paket unggulan & testimoni terbaru
+- CTA ke katalog & kontak (WhatsApp)
+
+#### 3.1.2 Katalog & Detail Produk
+- Listing paket/item dengan filter: kategori, rentang harga, tema (modern/adat/internasional), warna
+- Pencarian (search bar)
+- Halaman detail: galeri foto/video, deskripsi, harga, item termasuk dalam paket, syarat & ketentuan sewa
+- Indikator ketersediaan tanggal langsung di halaman detail
+
+#### 3.1.3 Galeri Portofolio
+- Galeri foto/video hasil kerja nyata, dikelompokkan per kategori/acara/tema
+- Lightbox viewer, lazy loading
+- Bisa difilter berdasarkan paket terkait
+
+#### 3.1.4 Testimoni
+- Menampilkan testimoni & rating klien (teks, foto, opsional video)
+- Testimoni hanya tampil setelah **disetujui admin** (moderasi)
+- Klien yang sudah menyelesaikan booking dapat submit testimoni + rating (1–5 bintang)
+
+#### 3.1.5 Kalender Ketersediaan
+- Kalender interaktif menampilkan tanggal tersedia/penuh untuk item/paket tertentu
+- Mencegah double booking pada tanggal yang sama untuk item fisik yang sama
+
+#### 3.1.6 Sistem Booking
+- Form booking: pilih paket/item, tanggal acara, lokasi acara, data pemesan
+- Kalkulasi otomatis harga + DP minimum
+- Upload bukti pembayaran DP atau integrasi payment gateway
+- Status booking real-time: `Menunggu Konfirmasi → Dikonfirmasi → DP Diterima → Lunas → Selesai / Dibatalkan`
+
+#### 3.1.7 Akun Pengguna
+- Register/Login (email/password, opsional Google OAuth)
+- Riwayat booking & status
+- Unduh invoice/kwitansi (PDF)
+- Edit profil
+
+#### 3.1.8 Kontak & Komunikasi
+- Tombol chat langsung ke WhatsApp Business (klik-to-chat dengan prefill pesan)
+- Form kontak/inquiry umum
+- FAQ
+
+#### 3.1.9 (Opsional Fase Lanjut) Blog/Tips
+- Artikel tips memilih rias/busana pernikahan (SEO & engagement)
+
+---
+
+### 3.2 Modul Admin (Admin Panel)
+
+#### 3.2.1 Dashboard
+- Ringkasan: jumlah booking baru, pendapatan bulan berjalan, tanggal acara terdekat, testimoni menunggu moderasi
+- Kalender global semua booking
+
+#### 3.2.2 Manajemen Produk/Paket
+- CRUD paket (nama, deskripsi, harga, kategori, item penyusun)
+- CRUD item individual (busana, aksesoris, jasa rias) beserta stok/jumlah unit fisik
+- Upload multi-gambar per produk
+- Atur status aktif/nonaktif produk
+
+#### 3.2.3 Manajemen Galeri
+- Upload/hapus/kelompokkan foto & video portofolio
+- Kaitkan galeri dengan paket/kategori tertentu
+
+#### 3.2.4 Manajemen Testimoni
+- Approve/reject testimoni masuk
+- Highlight testimoni pilihan ke landing page
+
+#### 3.2.5 Manajemen Booking
+- Lihat semua booking, filter status/tanggal
+- Konfirmasi/tolak booking, ubah status, reschedule
+- Verifikasi manual bukti pembayaran (jika transfer manual)
+- Catatan internal per booking (notes admin)
+
+#### 3.2.6 Manajemen Ketersediaan/Kalender
+- Blokir manual tanggal (maintenance, dicuci, dsb.) per item
+- Lihat konflik jadwal antar item dalam satu paket
+
+#### 3.2.7 Manajemen Pembayaran
+- Rekap pembayaran DP & pelunasan
+- Generate invoice/kwitansi otomatis (PDF)
+- Riwayat transaksi
+
+#### 3.2.8 Manajemen Pengguna & Staf
+- Kelola akun customer (lihat riwayat, blokir jika perlu)
+- Kelola akun staf/admin dengan **role-based access control (RBAC)**: Owner (akses penuh), Staf (booking & pembayaran saja)
+
+#### 3.2.9 Manajemen Konten
+- Kelola FAQ, halaman statis (Tentang Kami, Syarat & Ketentuan), blog (jika ada)
+
+#### 3.2.10 Laporan & Analitik
+- Laporan pendapatan per periode
+- Paket terlaris, tingkat booking per bulan (musim nikah)
+- Export laporan (Excel/PDF)
+
+#### 3.2.11 Notifikasi
+- Notifikasi in-app untuk booking baru & testimoni baru
+- Trigger email/WhatsApp API ke klien saat status booking berubah (opsional Fase 2)
+
+---
+
+## 4. Kebutuhan Non-Fungsional
+
+| Kategori | Kebutuhan |
+|---|---|
+| **Performance** | Halaman katalog & galeri load < 2 detik (gunakan lazy load & image CDN/compression) |
+| **Security** | Autentikasi JWT, password hashing (bcrypt/argon2), RBAC untuk admin, validasi input (Pydantic), proteksi CSRF/XSS, rate limiting pada endpoint publik |
+| **Usability** | Mobile-first responsive design, alur booking maksimal 3–4 langkah |
+| **Scalability** | CockroachDB mendukung horizontal scaling & multi-region jika bisnis berkembang ke banyak cabang/kota |
+| **Availability** | Target uptime 99%, backup database otomatis harian |
+| **Maintainability** | Kode terstruktur modular (FastAPI routers per domain, React feature-based folder structure) |
+| **Auditability** | Audit log untuk aksi admin penting (ubah harga, hapus produk, ubah status booking) |
+| **Localization** | Bahasa Indonesia sebagai default, format mata uang Rupiah, format tanggal lokal |
+
+---
+
+## 5. Arsitektur Sistem
+
+### 5.1 Gambaran Umum
+
+```
+                         ┌─────────────────────────┐
+                         │      CockroachDB          │
+                         │   (SQL, Distributed)      │
+                         └────────────▲──────────────┘
+                                      │ SQLAlchemy / async driver
+                         ┌────────────┴──────────────┐
+                         │      FastAPI Backend       │
+                         │  (1 service, modular API)  │
+                         │  /api/v1/public/*          │
+                         │  /api/v1/admin/*           │
+                         │  /api/v1/auth/*            │
+                         └──────┬───────────┬─────────┘
+                                │           │
+                 REST/JSON      │           │   REST/JSON
+                    ┌───────────▼──┐   ┌────▼───────────┐
+                    │ Customer Web │   │  Admin Panel    │
+                    │  (React SPA) │   │  (React SPA)    │
+                    └──────────────┘   └─────────────────┘
+```
+
+### 5.2 Pemisahan API
+Backend tunggal, namun endpoint dipisah secara logis (bukan server terpisah) agar mudah diberi middleware otorisasi berbeda:
+- `/api/v1/auth/*` — register, login, refresh token (dipakai kedua sisi)
+- `/api/v1/public/*` — katalog, galeri, testimoni (read-only, publik)
+- `/api/v1/customer/*` — booking, profil, riwayat (butuh login customer)
+- `/api/v1/admin/*` — seluruh manajemen (butuh role admin/staf, RBAC middleware)
+
+### 5.3 Struktur Direktori (Usulan)
+
+**Backend (FastAPI)**
+```
+backend/
+├── app/
+│   ├── main.py
+│   ├── core/         # config, security, dependencies
+│   ├── db/           # session, base model (SQLAlchemy)
+│   ├── models/        # ORM models (User, Product, Booking, dll.)
+│   ├── schemas/        # Pydantic schemas
+│   ├── api/
+│   │   ├── v1/
+│   │   │   ├── auth.py
+│   │   │   ├── public/  (products.py, gallery.py, testimonials.py)
+│   │   │   ├── customer/ (bookings.py, profile.py)
+│   │   │   └── admin/    (products.py, bookings.py, users.py, reports.py)
+│   ├── services/       # business logic (availability check, pricing, dsb.)
+│   └── utils/
+├── alembic/            # migrasi database
+└── requirements.txt
+```
+
+**Frontend (2 aplikasi React terpisah, atau monorepo)**
+```
+frontend/
+├── customer-web/     (React + Vite, Tailwind)
+└── admin-panel/      (React + Vite, Tailwind + komponen tabel/CRUD)
+```
+> Disarankan monorepo (misal dengan pnpm workspace) agar bisa berbagi `shared-ui` (komponen) dan `shared-types`/API client.
+
+### 5.4 Deployment (Usulan)
+- Reverse proxy: Nginx / Caddy (routing domain: `app.domain.com` untuk customer, `admin.domain.com` untuk admin panel)
+- Containerisasi: Docker Compose (backend, 2 frontend, CockroachDB cluster minimal 3 node untuk HA)
+- Storage gambar/video: object storage (S3-compatible, misal Cloudflare R2/MinIO) — jangan simpan file besar langsung di DB
+
+---
+
+## 6. Desain Database (CockroachDB)
+
+### 6.1 Daftar Tabel Utama
+
+| Tabel | Deskripsi Singkat |
+|---|---|
+| `users` | Data klien/customer |
+| `admins` | Data admin/staf + role |
+| `categories` | Kategori (Rias, Busana, Aksesoris, Paket) |
+| `products` | Paket/item yang bisa disewa |
+| `product_items` | Detail item fisik penyusun sebuah paket (untuk paket kombinasi) |
+| `product_images` | Foto produk (many-to-one ke products) |
+| `galleries` | Album galeri portofolio |
+| `gallery_images` | Foto/video dalam galeri |
+| `testimonials` | Testimoni & rating klien |
+| `bookings` | Data pemesanan |
+| `booking_items` | Rincian item yang dipesan dalam satu booking |
+| `booking_status_history` | Riwayat perubahan status booking (audit) |
+| `payments` | Data pembayaran (DP/pelunasan) |
+| `availability_blocks` | Tanggal yang diblokir/tidak tersedia per item |
+| `notifications` | Notifikasi in-app admin |
+| `audit_logs` | Log aksi penting admin |
+
+### 6.2 Skema Ringkas (contoh kolom kunci)
+
+```sql
+-- users
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    full_name STRING NOT NULL,
+    email STRING UNIQUE NOT NULL,
+    phone STRING,
+    password_hash STRING NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ
+);
+
+-- admins
+CREATE TABLE admins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    full_name STRING NOT NULL,
+    email STRING UNIQUE NOT NULL,
+    password_hash STRING NOT NULL,
+    role STRING NOT NULL CHECK (role IN ('owner','staff')),
+    created_at TIMESTAMPTZ DEFAULT now()
+    updated_at TIMESTAMPTZ
+);
+
+-- categories
+CREATE TABLE categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name STRING NOT NULL,      -- Rias, Busana, Aksesoris, Paket Kombinasi
+    slug STRING UNIQUE NOT NULL
+);
+
+-- products (paket atau item tunggal)
+CREATE TABLE products (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    category_id UUID REFERENCES categories(id),
+    name STRING NOT NULL,
+    description STRING,
+    price DECIMAL(12,2) NOT NULL,
+    dp_percentage DECIMAL(5,2) DEFAULT 30.00,
+    stock_unit INT DEFAULT 1,      -- jumlah unit fisik tersedia
+    is_active BOOL DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT now()
+    updated_at TIMESTAMPTZ
+);
+
+-- product_images
+CREATE TABLE product_images (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+    image_url STRING NOT NULL,
+    sort_order INT DEFAULT 0
+);
+
+-- galleries & gallery_images
+CREATE TABLE galleries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title STRING NOT NULL,
+    category_id UUID REFERENCES categories(id)
+);
+
+CREATE TABLE gallery_images (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    gallery_id UUID REFERENCES galleries(id) ON DELETE CASCADE,
+    media_url STRING NOT NULL,
+    media_type STRING CHECK (media_type IN ('image','video')) DEFAULT 'image'
+);
+
+-- testimonials
+CREATE TABLE testimonials (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    booking_id UUID REFERENCES bookings(id),
+    rating INT CHECK (rating BETWEEN 1 AND 5),
+    content STRING,
+    photo_url STRING,
+    status STRING CHECK (status IN ('pending','approved','rejected')) DEFAULT 'pending',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- bookings
+CREATE TABLE bookings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    event_date DATE NOT NULL,
+    event_location STRING,
+    total_price DECIMAL(12,2) NOT NULL,
+    dp_amount DECIMAL(12,2),
+    status STRING CHECK (status IN
+        ('pending','confirmed','dp_paid','fully_paid','completed','cancelled')
+    ) DEFAULT 'pending',
+    notes STRING,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- booking_items
+CREATE TABLE booking_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    booking_id UUID REFERENCES bookings(id) ON DELETE CASCADE,
+    product_id UUID REFERENCES products(id),
+    quantity INT DEFAULT 1,
+    price_at_booking DECIMAL(12,2) NOT NULL
+);
+
+-- availability_blocks (mencegah double booking per item per tanggal)
+CREATE TABLE availability_blocks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID REFERENCES products(id),
+    blocked_date DATE NOT NULL,
+    booking_id UUID REFERENCES bookings(id),   -- NULL jika diblokir manual oleh admin
+    reason STRING,
+    UNIQUE (product_id, blocked_date)
+);
+
+-- payments
+CREATE TABLE payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    booking_id UUID REFERENCES bookings(id) ON DELETE CASCADE,
+    amount DECIMAL(12,2) NOT NULL,
+    type STRING CHECK (type IN ('dp','pelunasan')) NOT NULL,
+    method STRING,          -- transfer manual, midtrans, dsb.
+    proof_url STRING,
+    verified_by UUID REFERENCES admins(id),
+    verified_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- audit_logs
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    admin_id UUID REFERENCES admins(id),
+    action STRING NOT NULL,
+    entity STRING,
+    entity_id UUID,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+> Catatan: `UNIQUE (product_id, blocked_date)` pada `availability_blocks` adalah mekanisme kunci untuk mencegah **double booking** item fisik yang sama pada tanggal yang sama — ini krusial karena bisnis ini berbeda dari WO yang biasanya tidak punya batasan stok fisik seketat ini.
+
+---
+
+## 7. Ringkasan Endpoint API
+
+### Public (tanpa login)
+- `GET /api/v1/public/products` — daftar produk (filter kategori, harga)
+- `GET /api/v1/public/products/{id}` — detail produk
+- `GET /api/v1/public/products/{id}/availability` — cek kalender ketersediaan
+- `GET /api/v1/public/galleries` — daftar galeri
+- `GET /api/v1/public/testimonials` — testimoni yang sudah approved
+
+### Auth
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/refresh`
+
+### Customer (login required)
+- `POST /api/v1/customer/bookings` — buat booking baru
+- `GET /api/v1/customer/bookings` — riwayat booking milik user
+- `POST /api/v1/customer/bookings/{id}/payment` — upload bukti pembayaran
+- `POST /api/v1/customer/testimonials` — submit testimoni (setelah booking selesai)
+
+### Admin (role admin/staff, RBAC)
+- `POST/PUT/DELETE /api/v1/admin/products`
+- `POST/PUT/DELETE /api/v1/admin/galleries`
+- `PUT /api/v1/admin/testimonials/{id}/moderate`
+- `GET/PUT /api/v1/admin/bookings` — lihat & ubah status booking
+- `PUT /api/v1/admin/payments/{id}/verify`
+- `GET /api/v1/admin/reports/revenue`
+- `POST /api/v1/admin/availability-blocks` — blokir tanggal manual
+
+---
+
+## 8. Teknologi (Tech Stack)
+
+| Layer | Teknologi |
+|---|---|
+| Frontend (Customer & Admin) | React + Vite, TailwindCSS, React Query/TanStack Query, React Router |
+| Backend | FastAPI (Python), Pydantic v2, SQLAlchemy 2.0 (async) |
+| Database | CockroachDB (SQL, Postgres wire-protocol) |
+| Migrasi DB | Alembic |
+| Autentikasi | JWT (access + refresh token), bcrypt/argon2 |
+| Storage Media | S3-compatible object storage (Cloudflare R2 / MinIO) |
+| Payment Gateway | Midtrans / Xendit (opsional Fase 2) |
+| Notifikasi | Fonnte/WhatsApp Business API (opsional, Amamiya sudah familiar dari proyek sebelumnya) |
+| Deployment | Docker Compose, Nginx reverse proxy |
+| Testing | Pytest (backend), Vitest/React Testing Library (frontend) |
+
+---
+
+## 9. Roadmap Pengembangan
+
+### Fase 1 — MVP
+- Autentikasi (customer & admin)
+- CRUD produk, galeri, testimoni (sisi admin)
+- Katalog, detail produk, galeri, testimoni (sisi customer)
+- Booking manual (form + upload bukti transfer, verifikasi manual admin)
+- Kalender ketersediaan dasar
+
+### Fase 2 — Peningkatan
+- Integrasi payment gateway otomatis (Xendit)
+- Notifikasi WhatsApp/email otomatis per perubahan status booking
+- Generate invoice PDF otomatis
+- Dashboard analitik & laporan
+
+### Fase 3 — Pengembangan Lanjut
+- Blog/tips wedding untuk SEO
+- Multi-cabang/multi-kota (memanfaatkan sifat distributed CockroachDB)
+- Rekomendasi paket berbasis preferensi (opsional AI/RAG — relevan dengan pengalaman Aimer Cell)
+
+---
+
+## 10. Catatan Tambahan
+- Karena sistem ini menyewakan **barang fisik** (gaun, aksesoris), pertimbangkan menambahkan status "dalam pencucian/perawatan" pada `availability_blocks` agar admin bisa mem-blokir jeda waktu setelah acara sebelum item bisa disewakan lagi.
+- Modul rating & testimoni sebaiknya hanya bisa diisi oleh user yang bookingnya berstatus `completed`, untuk menjaga keaslian testimoni.
+- Pertimbangkan rate limiting & CAPTCHA pada form booking publik untuk mencegah spam booking palsu.
