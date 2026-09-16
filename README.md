@@ -31,26 +31,6 @@ Dibangun berdasarkan spesifikasi **Software Requirements Specification (SRS v1.0
 
 ---
 
-## 🔑 Akun Demo Default (Siap Digunakan)
-
-### 1. Akun Administrator
-- **Owner (Akses Penuh):**
-  - Email: `admin@radja.com`
-  - Password: `admin123`
-- **Staf / Kasir:**
-  - Email: `staf@radja.com`
-  - Password: `staf123`
-
-### 2. Akun Pelanggan (Customer)
-- **Customer 1:**
-  - Email: `amamiya@wedding.com`
-  - Password: `customer123`
-- **Customer 2:**
-  - Email: `siti.rahma@gmail.com`
-  - Password: `customer123`
-
----
-
 ## ⚙️ Konfigurasi Default (.env)
 
 File konfigurasi backend `.env` sudah disediakan secara default pada direktori `backend/.env`:
